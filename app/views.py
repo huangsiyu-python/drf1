@@ -1,187 +1,123 @@
-from django.shortcuts import render
-
-# Create your views here.
-from django.db import transaction
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import render
-
-# Create your views here.
 from django.utils.decorators import method_decorator
+
 from django.views import View
-from django.views.decorators.csrf import csrf_exempt
-from rest_framework.parsers import JSONParser,FormParser, MultiPartParser
-from rest_framework.renderers import BrowsableAPIRenderer
-from rest_framework.response import Response
+from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import settings
+from rest_framework.renderers import JSONRenderer, BrowsableAPIRenderer
+from rest_framework.parsers import JSONParser, FormParser, MultiPartParser
 
-from app.models import UserInfo, Student, Employee
-# from .serializers import EmployeeModelSerializer, EmployeeDeserializer
+from app.models import UserInfo
 
-
+# @csrf_protect  # 全局禁用csrf的情况 为某个视图单独添加csrf认证
+@csrf_exempt  # 为某个视图免除csrf认证
 def user(request):
-    print("请求到达")
-    if request.method=="GET":
-        print("GET")
+    if request.method == "GET":
+        print("GET SUCCESS  查询")
+        # TODO 查询用户的相关逻辑
         return HttpResponse("GET SUCCESS")
-    elif request.method=="POST":
-        print("POST")
+
+    elif request.method == "POST":
+        print("POST SUCCESS  添加")
+        # TODO 添加用户的相关的逻辑
         return HttpResponse("POST SUCCESS")
+
     elif request.method == "PUT":
-        print("PUT 修改")
+        print("PUT SUCCESS  修改")
         return HttpResponse("PUT SUCCESS")
+
     elif request.method == "DELETE":
-        print("DELETE 删除")
+        print("DELETE SUCCESS  删除")
         return HttpResponse("DELETE SUCCESS")
 
-@method_decorator(csrf_exempt, name="dispatch")
+@method_decorator(csrf_exempt, name="dispatch")  # 让类视图免除csrf认证
 class UserView(View):
     def get(self, request, *args, **kwargs):
-        print("GET API")
-        user_id = kwargs.get("pk")
-        if user_id:
-            # 查询单个
-            user_values = UserInfo.objects.filter(pk=user_id).values("username", "password", "gender").first()
-            if user_values:
-                return Response({
+        # 获取用户的id
+        user_id = kwargs.get("id")
+        if user_id:  # 查询单个
+            # user_val = User.objects.filter(pk=user_id).values("username", "password", "gender").first()
+            user_val = User.objects.get(pk=user_id)
+            if user_val:
+                # 如果查询出对应的用户信息，则将用户的信息返回到前端
+                return JsonResponse({
                     "status": 200,
-                    "message": "获取用户成功",
-                    "results": user_values})
+                    "message": "查询单个用户成功",
+                    "results": user_val
+                })
         else:
-            user_list = UserInfo.objects.all().values("username", "password", "gender")
+            user_list = User.objects.all().values("username", "password", "gender")
+            print(type(user_list))
             if user_list:
-                return Response({
-                    "status": 201,
-                    "message": "获取用户列表成功",
-                    "results": list(user_list)
+                return JsonResponse({
+                    "status": 200,
+                    "message": "查询所有用户成功",
+                    "results": list(user_list),
                 })
 
-        return Response({
-            "status": 400,
-            "message": "获取用户不存在",
+        return JsonResponse({
+            "status": 500,
+            "message": "查询失败",
         })
 
     def post(self, request, *args, **kwargs):
-        """完成新增单个用户的操作"""
-        print(request.POST)
+        username = request.POST.get("username")
+        pwd = request.POST.get("password")
         try:
-            user_obj = UserInfo.objects.create(**request.POST.dict())
-            if user_obj:
-                return Response({
-                    "status": 200,
-                    "message": "新增用户成功",
-                    "results": {"username": user_obj.username, "gender": user_obj.gender}
-                })
-            else:
-                return Response({
-                    "status": 500,
-                    "message": "新增用户失败",
-                })
+            user_obj = User.objects.create(username=username, password=pwd)
+            return JsonResponse({
+                "status": 201,
+                "message": "创建用户成功",
+                "results": {"username": user_obj.username, "gender": user_obj.gender}
+            })
         except:
-            return Response({
-                "status": 501,
-                "message": "参数有误",
+            return JsonResponse({
+                "status": 500,
+                "message": "创建用户失败",
             })
 
     def put(self, request, *args, **kwargs):
-        username = request.username
-        password = request.password
-        gender = request.gender
-        user_id = kwargs.get("pk")
-        user = UserInfo.objects.filter(pk=user_id).first()
-        if user:
-            user_obj = UserInfo.objects.create(username=username,password=password,gender=gender)
-            if user_obj:
-                return Response({
-                    "status":200,
-                    "message":"修改用户信息成功",
-                    "results":{"username":user_obj.username,"password":user_obj.password,"gender":user_obj.gender}
-                })
-            else:
-                return Response({
-                    "status": 500,
-                    "message": "修改用户信息失败"
-                })
-        else:
-            return Response({
-                "status":500,
-                "message":"修改用户信息失败"
-            })
-
+        print("PUT SUCCESS  修改")
+        return HttpResponse("PUT SUCCESS")
 
     def delete(self, request, *args, **kwargs):
-        user_id = kwargs.get("pk")
-        if user_id:
-            user = UserInfo.objects.filter(pk=user_id).delete()
-            return Response({
-                "status": 200,
-                "message": "删除用户成功"
-            })
-        else:
-            return Response({
-                "status": 500,
-                "message": "删除用户信息失败"
-            })
+        # request:  WSGIRequest
+        print("DELETE SUCCESS  删除")
+        return HttpResponse("DELETE SUCCESS")
 
-class StudentView(APIView):
-    # renderer_classes = [BrowsableAPIRenderer]
-    parser_classes = [JSONParser]
-    # parser_classes = [MultiPartParser]
-    # parser_classes = [FormParser]
+
+# 开发基于drf的视图
+class UserAPIView(APIView):
+    # renderer_classes = (BrowsableAPIRenderer,)
+
     def get(self, request, *args, **kwargs):
+        user_id = kwargs.get("pk")
+        user_val = User.objects.get(pk=user_id)
+        # request：<rest_framework.request.Request>
+        # get(self, request, *args, **kwargs):
         print(request._request.GET)
-        # 通过DRF 的request对象获取参数
         print(request.GET)
-        # 通过quer_params来获取参数
         print(request.query_params)
-        stu_id = kwargs.get("demo")
-        if stu_id:
-            stu_obj = UserInfo.objects.get(pk=stu_id)
-            # 如果有值  代表查询成功
-            if stu_obj:
-                return Response({
-                    "status": 200,
-                    "message": "GET USER SUCCESS",
-                    "results": stu_obj,
-                })
-            else:
-                # 代表查询的用户信息不存在
-                return Response({
-                    "status": 403,
-                    "message": "查询的用户不存在",
-                })
-        # id如果不存在  代表查询的是全部的用户信息
-        else:
-            stu_val = UserInfo.objects.all().values("username", "password", "gender")
-            return Response({
-                "status": 200,
-                "message": "查询所有用户成功",
-                "results": list(stu_val)
-            })
 
-    def post(self,request,*args,**kwargs):
-        print(request.POST.dict())
-        print(request._request.POST)  # Django 原生的request对象
-        print(request.POST)  # DRF 封装后的request对象
+        user_id = kwargs.get("pk")
+
+        return Response("DRF GET SUCCESS")
+
+    def post(self, request, *args, **kwargs):
+        print(request._request.POST)
+        print(request.POST)
         print(request.data)
 
-        try:
-            stu_obj = UserInfo.objects.create(**request.POST.dict())
-            if stu_obj:
-                return Response({
-                    "status": 200,
-                    "message": "添加学生成功",
-                    "results":{
-                        "username":stu_obj.username,
-                        "password":stu_obj.password
-                    }
-                })
-            else:
-                return Response({
-                    "status": 500,
-                    "message": "添加学生失败"
-                })
-        except:
-            return Response({
-                "status": 501,
-                "message": "参数有误"
-            })
+        return Response("POST GET SUCCESS")
+
+
+class StudentAPIView(APIView):
+    parser_classes = [MultiPartParser]
+    def post(self, request, *args, **kwargs):
+        print("POST方法")
+        # print(request.POST)
+        print(request.data)
+
+        return Response("POST方法访问成功")
